@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ITEP Timetable Builder — Autumn 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --orange:#f5811f; --orange-dark:#c9600e; --orange-light:#fff1e0;
+    --pink:#e8558a; --pink-dark:#b83766; --pink-light:#ffe7f0;
+    --purple:#7c4dff; --purple-dark:#5b2fd9; --purple-light:#f1ecfa;
+    --teal:#00b0a6; --teal-dark:#00857d; --teal-light:#e0faf8;
+    --ink:#2b2320; --paper:#fffaf5; --line:#f0d9c4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; background:linear-gradient(160deg,#fff6ef,#fff0f6 45%,#f2ecff 100%);
+    color:var(--ink); padding:24px 16px 60px;
+  }
+  h1{font-size:1.5rem; margin:0 0 2px; background:linear-gradient(100deg,var(--orange-dark),var(--pink-dark) 55%,var(--purple-dark)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; display:inline-block; font-weight:800;}
+  .sub{color:#7a655c; margin:0 0 20px; font-size:.92rem;}
+  .topbar{max-width:1180px; margin:0 auto 4px; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;}
+  .panel{
+    background:#fff; border:1px solid var(--line); border-top:4px solid; border-image:linear-gradient(90deg,var(--orange),var(--pink),var(--purple)) 1;
+    border-radius:14px; padding:18px 20px;
+    max-width:1180px; margin:0 auto 18px; box-shadow:0 3px 14px rgba(124,77,255,.1);
+  }
+  .controls{display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;}
+  .field{display:flex; flex-direction:column; gap:5px; min-width:190px;}
+  label{font-size:.78rem; font-weight:600; color:var(--pink-dark); text-transform:uppercase; letter-spacing:.03em;}
+  select, input[type=text]{
+    padding:9px 10px; border-radius:8px; border:1.5px solid var(--line); background:var(--paper);
+    font-size:.88rem; color:var(--ink);
+  }
+  select{cursor:pointer;}
+  select:focus, input:focus{outline:2px solid var(--purple);}
+  button{
+    border:none; border-radius:8px; padding:10px 18px; font-weight:600; cursor:pointer; font-size:.9rem;
+    background:linear-gradient(135deg,var(--orange),var(--pink) 60%,var(--purple)); color:#fff; box-shadow:0 2px 8px rgba(124,77,255,.35);
+  }
+  button:hover{filter:brightness(1.06);}
+  button.secondary{background:#fff; color:var(--purple-dark); border:1.5px solid var(--purple); box-shadow:none;}
+  button.ghost{background:#fff; color:var(--teal-dark); border:1.5px solid var(--teal); box-shadow:none; padding:8px 12px; font-size:.82rem;}
+  button.danger{background:#fff; color:#c0392b; border:1.5px solid #e6b3ab; box-shadow:none; padding:6px 10px; font-size:.78rem;}
+  .note{font-size:.8rem; color:#8a7468; max-width:1180px; margin:0 auto 14px; line-height:1.5;}
+  .legend{display:flex; gap:18px; font-size:.82rem; margin-top:4px; flex-wrap:wrap;}
+  .swatch{display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-1px;}
+  #timetableWrap{max-width:1180px; margin:0 auto;}
+  #timetableCard{background:#fff; border-radius:14px; padding:20px; border:1px solid var(--line); box-shadow:0 4px 18px rgba(124,77,255,.12);}
+  #ttTitle{margin:0 0 2px; background:linear-gradient(100deg,var(--orange-dark),var(--pink-dark),var(--purple-dark)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; font-size:1.15rem; font-weight:800;}
+  #ttMeta{color:#8a7468; font-size:.85rem; margin-bottom:14px;}
+  .grid-outer{overflow-x:auto;}
+  .grid{
+    display:grid; grid-template-columns:64px repeat(5,1fr); min-width:760px;
+    border:1px solid var(--line); border-radius:10px; overflow:hidden;
+  }
+  .head{background:linear-gradient(135deg,var(--orange-light),var(--pink-light) 55%,var(--purple-light)); font-weight:700; text-align:center; padding:8px 4px; font-size:.82rem; color:var(--purple-dark); border-bottom:1px solid var(--line); border-left:1px solid var(--line);}
+  .head:first-child{border-left:none;}
+  .timecol{position:relative; border-left:1px solid var(--line);}
+  .timecol:first-child{border-left:none;}
+  .hourlabel{position:absolute; left:2px; font-size:.65rem; color:#b09a8d; transform:translateY(-6px);}
+  .daycol{position:relative; border-left:1px solid var(--line); background:repeating-linear-gradient(180deg,#fff,#fff 43px,#fbf6f2 43px,#fbf6f2 44px);}
+  .event{
+    position:absolute; left:3px; right:3px; border-radius:7px; padding:5px 7px; font-size:.72rem; line-height:1.25;
+    color:#fff; cursor:pointer; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.15); transition:transform .12s;
+  }
+  .event:hover{transform:scale(1.015); z-index:5;}
+  .event.major{background:linear-gradient(160deg,var(--orange),var(--orange-dark));}
+  .event.minor{background:linear-gradient(160deg,var(--pink),var(--pink-dark));}
+  .event.pedagogy{background:linear-gradient(160deg,var(--purple),var(--purple-dark));}
+  .event .code{font-weight:700; display:block;}
+  .event .rm{opacity:.9; font-size:.68rem;}
+  .unscheduled{margin-top:16px;}
+  .unscheduled h3{font-size:.9rem; color:var(--pink-dark); margin:0 0 8px;}
+  .uitem{
+    display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:8px; margin-bottom:6px;
+    font-size:.82rem; border:1px dashed var(--line);
+  }
+  .uitem.major{background:var(--orange-light);}
+  .uitem.minor{background:var(--pink-light);}
+  .uitem.pedagogy{background:var(--purple-light);}
+  .placeholder{text-align:center; color:#b09a8d; padding:60px 20px; font-size:.95rem;}
+  .modal-bg{position:fixed; inset:0; background:rgba(43,35,32,.45); display:none; align-items:center; justify-content:center; z-index:50;}
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff; border-radius:14px; padding:22px; width:320px; max-width:90vw; box-shadow:0 10px 40px rgba(0,0,0,.25); border-top:4px solid; border-image:linear-gradient(90deg,var(--orange),var(--pink),var(--purple)) 1;}
+  .modal h3{margin:0 0 4px; font-size:1rem; color:var(--purple-dark);}
+  .modal p{margin:0 0 14px; font-size:.82rem; color:#8a7468;}
+  .modal .field{margin-bottom:12px;}
+  .modal-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:8px;}
+  .actions-row{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;}
+
+  #adminPanel{display:none; max-width:1180px; margin:0 auto 22px; background:linear-gradient(160deg,#fff8f2,#faf5ff); border:2px dashed var(--purple); border-radius:14px; padding:18px 20px;}
+  #adminPanel.show{display:block;}
+  #adminPanel h2{margin:0 0 4px; font-size:1.15rem; color:var(--purple-dark);}
+  #adminPanel .sub{margin:0 0 16px;}
+  table.admin{width:100%; border-collapse:collapse; font-size:.8rem; margin-bottom:14px;}
+  table.admin th{text-align:left; padding:6px 6px; color:var(--teal-dark); font-size:.72rem; text-transform:uppercase; letter-spacing:.02em; border-bottom:2px solid var(--line);}
+  table.admin td{padding:5px 6px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  table.admin input[type=text]{width:100%; min-width:70px; padding:6px 7px; font-size:.78rem;}
+  table.admin input[type=checkbox]{width:16px; height:16px; cursor:pointer;}
+  .admin-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;}
+  .admin-help{font-size:.74rem; color:#a08d80; margin:-6px 0 12px;}
+  .admin-toolbar{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;}
+  #importFile{display:none;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>🎓 ITEP Timetable Builder</h1>
+    <p class="sub">Autumn 2026 · Pick your Major and (optionally) a Minor to see your personal class schedule.</p>
+  </div>
+</div>
+
+<div id="adminPanel">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+    <h2>🔧 Admin — Edit Timetable Data</h2>
+    <button class="ghost" id="adminClose">✖ Close</button>
+  </div>
+  <p class="sub">Changes save to this browser automatically. Use Export/Import to move your edits to another device or hand them to someone else.</p>
+
+  <div class="admin-toolbar">
+    <div class="field">
+      <label>Department</label>
+      <select id="adminDept">
+        <option value="__common__">Common (all students)</option>
+        <option value="economics">Economics</option>
+        <option value="mathematics">Mathematics</option>
+        <option value="physics">Physics</option>
+        <option value="chemistry">Chemistry</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Semester</label>
+      <select id="adminSem"></select>
+    </div>
+    <button id="adminAddRow">+ Add course</button>
+    <button class="secondary" id="adminSaveBtn">💾 Save changes</button>
+    <button class="secondary" id="adminResetBtn">↩ Reset this table to default</button>
+  </div>
+  <p class="admin-help">Slots: comma-separated codes from the official legend — lecture: mwf, tr, MW1, MW2, MW3, TR1, TR2, TR3, M, T, W, R, F1–F4 · lab: L1–L10. Leave blank for "not yet scheduled" (shown under the grid). Tick <b>Major</b> if this course counts toward that department's own major; tick <b>Minor</b> if a student minoring in this department takes it; tick <b>Pedagogy</b> if this course can be taken as a Pedagogy Paper (available to students in Semesters 4, 5 and 6 whose major is a different department).</p>
+
+  <table class="admin" id="adminTable">
+    <thead>
+      <tr><th style="width:11%">Code</th><th style="width:23%">Name</th><th style="width:14%">Faculty</th><th style="width:8%">Room</th><th style="width:13%">Slots</th><th style="width:6%">Major</th><th style="width:6%">Minor</th><th style="width:8%">Pedagogy</th><th></th></tr>
+    </thead>
+    <tbody id="adminTbody"></tbody>
+  </table>
+
+  <div class="admin-actions">
+    <button class="ghost" id="exportBtn">⬇ Export all data (JSON)</button>
+    <button class="ghost" id="importBtn">⬆ Import data (JSON)</button>
+    <button class="ghost" id="factoryResetBtn">⚠ Reset ALL data to factory default</button>
+    <input type="file" id="importFile" accept="application/json">
+  </div>
+
+  <h2 style="margin-top:22px;">📅 Manually shift classes</h2>
+  <p class="admin-help" style="margin-bottom:12px;">This shows the saved courses for the department/semester picked above. Click any class block to move it to a different day/time — this overrides the slot code for that class specifically. Save any text-table edits first so this preview reflects them.</p>
+  <div id="adminPreviewCard" style="background:#fff; border-radius:12px; padding:16px; border:1px solid var(--line);"></div>
+</div>
+
+<div class="panel">
+  <div class="controls">
+    <div class="field">
+      <label for="major">Major (compulsory)</label>
+      <select id="major"></select>
+    </div>
+    <div class="field">
+      <label for="semester">Semester</label>
+      <select id="semester"></select>
+    </div>
+    <div class="field">
+      <label for="minor">Minor (optional)</label>
+      <select id="minor"></select>
+    </div>
+    <div class="field" id="pedagogyField" style="display:none">
+      <label for="pedagogy">Pedagogy Paper</label>
+      <select id="pedagogy"></select>
+    </div>
+    <button id="buildBtn">Build my timetable</button>
+  </div>
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--orange)"></span>Major course</span>
+    <span><span class="swatch" style="background:var(--pink)"></span>Minor course</span>
+    <span><span class="swatch" style="background:var(--purple)"></span>Pedagogy Paper</span>
+  </div>
+</div>
+
+<p class="note">Click any class block to shift it to a different day/time before you download — useful if a faculty member has since changed the slot. Times shown are drawn from the official Autumn 2026 slot sheet; a few minor electives don't yet have an assigned slot and are listed below the grid instead. Data for Semesters 2, 4, 6, 8 will be added once available.</p>
+
+<div id="timetableWrap">
+  <div id="timetableCard">
+    <div id="ttInner"><div class="placeholder">Choose a major and semester above, then click "Build my timetable".</div></div>
+  </div>
+  <div class="actions-row" id="actionsRow" style="display:none;">
+    <div class="field" style="min-width:200px;">
+      <label for="studentNameInput">Your name (shown on JPG)</label>
+      <input type="text" id="studentNameInput" placeholder="e.g. Aditi Sharma">
+    </div>
+    <button id="downloadBtn" style="background:linear-gradient(135deg,var(--teal),var(--teal-dark));">⬇ Download as JPG</button>
+    <button class="secondary" id="resetBtn">Reset any manual shifts</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="pwBg">
+  <div class="modal">
+    <h3>🔒 Admin access</h3>
+    <p>Enter the admin password to open the Admin Panel.</p>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="pwInput" autocomplete="off" style="letter-spacing:2px;">
+    </div>
+    <p id="pwError" style="display:none; color:#c0392b; font-size:.8rem; margin:-6px 0 10px;">Incorrect password.</p>
+    <div class="modal-actions">
+      <button class="secondary" id="pwCancel">Cancel</button>
+      <button id="pwSubmit">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Shift class</h3>
+    <p id="modalSub">Pick a new day and start time for this class.</p>
+    <p style="font-size:.74rem; color:#a08d80; margin:-8px 0 14px;">This applies to just this one weekly meeting of the course — handy if a course has an extra hour that only meets once, or if a particular meeting has been cancelled.</p>
+    <div class="field">
+      <label>Day</label>
+      <select id="shiftDay"></select>
+    </div>
+    <div class="field">
+      <label>Start time</label>
+      <select id="shiftTime"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="danger" id="modalDelete" style="margin-right:auto;">🗑 Delete this class</button>
+      <button class="secondary" id="modalCancel">Cancel</button>
+      <button id="modalSave">Save shift</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   SLOT TIME DECODER (per official Autumn 2026 slot legend)
+   ============================================================ */
+const SLOT = {
+  mwf: [['Mon','8:00','8:55'],['Wed','8:00','8:55'],['Fri','8:00','8:55']],
+  tr:  [['Tue','8:00','8:55'],['Thu','8:00','8:55']],
+  MW1: [['Mon','9:00','10:55'],['Wed','9:00','10:55']],
+  MW2: [['Mon','11:00','12:55'],['Wed','11:00','12:55']],
+  MW3: [['Mon','14:30','16:25'],['Wed','14:30','16:25']],
+  TR1: [['Tue','9:00','10:55'],['Thu','9:00','10:55']],
+  TR2: [['Tue','11:00','12:55'],['Thu','11:00','12:55']],
+  TR3: [['Tue','14:30','16:25'],['Thu','14:30','16:25']],
+  M:   [['Mon','16:30','18:25']],
+  T:   [['Tue','16:30','18:25']],
+  W:   [['Wed','16:30','18:25']],
+  R:   [['Thu','16:30','18:25']],
+  F1:  [['Fri','11:00','12:55']],
+  F2:  [['Fri','14:30','16:25']],
+  F3:  [['Fri','16:30','18:25']],
+  F4:  [['Fri','9:00','10:55']],
+  L1:  [['Mon','10:00','12:55']], L2:[['Mon','14:30','17:25']],
+  L3:  [['Tue','10:00','12:55']], L4:[['Tue','14:30','17:25']],
+  L5:  [['Wed','10:00','12:55']], L6:[['Wed','14:30','17:25']],
+  L7:  [['Thu','10:00','12:55']], L8:[['Thu','14:30','17:25']],
+  L9:  [['Fri','10:00','12:55']], L10:[['Fri','14:30','17:25']],
+};
+const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+const MAJORS = ['economics','mathematics','physics','chemistry'];
+const SEMESTERS = [1,2,3,4,5,6,7,8];
+const DEPT_NAMES = {economics:'Economics', mathematics:'Mathematics', physics:'Physics', chemistry:'Chemistry'};
+
+function Crs(code,name,faculty,room,slots,isMajor,isMinor,isPedagogy){
+  return {code,name,faculty,room,slots:[...slots],isMajor:!!isMajor,isMinor:!!isMinor,isPedagogy:!!isPedagogy,manualOverrides:[]};
+}
+
+/* ============================================================
+   FACTORY-DEFAULT DATA  (from Autumn 2026 slot sheet
+   + Semester-wise Major/Minor Subjects document)
+   ============================================================ */
+function factoryData(){
+  return {
+    COMMON: {
+      1: [ Crs('HS1L005','Language 1: Sanskrit','Adjunct Faculty','R23S',['mwf']),
+           Crs('HS1L006','Understanding India (Indian Ethos & Knowledge Systems)','Dr. R. V. Raghavan','R23S',['M']),
+           Crs('HS1L003','Evolution of Indian Education','Dr. R. V. Raghavan','R23S',['MW3']),
+           Crs('HS1L004','Art (Performing & Visual) & Creative Expressions','Dr. A. K. Rath','R23S',['W']) ],
+      3: [ Crs('HS2L011','Child Development & Educational Psychology','Dr. P. Bhattacharya','R04S',['TR2']),
+           Crs('ED2L001','Pedagogy','Adjunct Faculty','R04S',['TR3']) ],
+      5: [ Crs('ED3L001','ICT in Education','Dr. Rajkumar Guduru','R00S',['F2']) ],
+      7: [ Crs('ED4L001','Curriculum Planning & Development (Stage Specific)','Adjunct Faculty','L11S',['F1']),
+           Crs('ED4L002','Perspectives on School Leadership & Management','Adjunct Faculty','R23S',['F2']),
+           Crs('HS4L021','Art (Performing & Visual) & Creative Expressions','A. K. Rath','R23S',['F3']),
+           Crs('ED4L003','Sports, Nutrition and Fitness','Adjunct Faculty','R05S',['F4']),
+           Crs('ED4L004','School-based Research Project','Dr. Sitakanta Panda','U04M',['L1']),
+           Crs('ED4L005','Internship in Teaching','Dr. Sitakanta Panda','L12M',['L9']) ],
+    },
+    COURSES: {
+      economics: {
+        1:[ Crs('ES1L001','Microeconomics I','Dr. N. R. Jena','R23S',['TR2'],true,true),
+            Crs('ES1L002','Macroeconomics I','Dr. A. Bhandari','R23S',['M'],true,true) ],
+        3:[ Crs('ES2L001','Statistics for Economics','Dr. Sayel Basel','R03S',['MW1'],true,false),
+            Crs('ES2L002','Public Economics','Dr. Sitakanta Panda','R03S',['TR1'],true,true),
+            Crs('ES2L003','Development Economics','Dr. Dukhabandu Sahoo','R11S',['MW2'],true,true) ],
+        5:[ Crs('ED3L003','Pedagogy for Economics – 2','Dr. Dukhabandu Sahoo','R11S',['TR2'],true,false),
+            Crs('ES3L001','Financial Economics','Dr. Sayel Basel','L17M',['MW2'],true,false),
+            Crs('ES3L002','Law and Economics','Dr. Sitakanta Panda','L12M',['MW3'],true,false),
+            Crs('ES3L003','Environmental & Natural Resource Economics','Dr. N. R. Jena','R03S',['TR3'],true,false),
+            Crs('ED3PIP','Pre-internship Practice (Demo lessons, Peer teaching)','Dr. M. Dash, Dr. N.R. Jena, Dr. A. Bhandari, Dr. S. Basel','R04S',['F4'],true,false),
+            Crs('ES3ELEC','International Economics','TBA','TBA',[],false,true) ],
+        7:[]
+      },
+      mathematics: {
+        1:[ Crs('MA1L301','Calculus and Analytic Geometry','Dr. B. Paul','R23S',['tr'],true,true),
+            Crs('MA1L302','Linear Algebra','Dr. S. Selvaraja','R23S',['TR1','L3','L4'],true,true) ],
+        3:[ Crs('MA2L301','C-programming with LAB','Dr. S. Debnath','R04S',['MW3','L9'],true,true),
+            Crs('MA2L302','Discrete Mathematics','Dr. S. Debnath','R04S',['MW1'],true,false),
+            Crs('MA2L303','Differential Equation','Dr. B. Mandal','R04S',['MW1'],true,false) ],
+        5:[ Crs('ED3L006','Pedagogy for Mathematics – 2','Prof. T. Nayak','R00S',['F3'],true,false),
+            Crs('MA3L301','Elementary Number Theory','Dr. N. Saikia','R00S',['MW3'],true,false),
+            Crs('MA3L302','Graph Theory','Dr. S. Selvaraja','R00S',['MW2'],true,false),
+            Crs('MA3L303','Elective: Functions of Several Variables','Dr. B. Paul','R00S',['TR3'],true,false),
+            Crs('MA3S301','Seminar','Dr. S. Prajapati','R00S',['T'],true,false),
+            Crs('ED3PIP','Pre-internship Practice (Demo lessons, Peer teaching)','Dr. V.R. Allu, Dr. A.D. Sarkar, Dr. B.C. Mandal, Dr. D. Choudhuri','R00S',['F4'],true,false),
+            Crs('MA3ELEC','Numerical Methods','TBA','TBA',[],false,true) ],
+        7:[]
+      },
+      physics: {
+        1:[ Crs('PH1L301','Mechanics, Waves and Oscillations','Prof. N. Mohapatra','R23S',['TR3','L5','L6'],true,true),
+            Crs('PH1P301','Physics Lab I (Mechanics, Waves & Oscillations)','Prof. S. K. Nayak','—',['L10'],true,true) ],
+        3:[ Crs('PH2L301','Electromagnetic Waves and Optics','Prof. R. Jha','R04S',['MW3'],true,true),
+            Crs('PH2L302','Quantum Physics I','Dr. M. Bandyopadhyay','R04S',['TR1'],true,true),
+            Crs('PH2P301','Physics Lab II (Optics & Modern Physics)','Prof. C. Bhamidipati, Dr. N. Acharya','—',['L1','L5','TR2'],true,false) ],
+        5:[ Crs('ED3L004','Pedagogy for Physics – 2','Dr. I. Yadav','R00S',['F4'],true,false),
+            Crs('PH3L301','Condensed Matter Physics','Dr. J. Midya','R01S',['TR3'],true,false),
+            Crs('PH3L302','Quantum Physics-II','Dr. R. Ghosh','R01S',['MW3'],true,false),
+            Crs('PH3L303','Mathematical Physics II','Dr. P. Padmanabhan','R01S',['MW2'],true,false),
+            Crs('PH3P301','Advanced Experimental Techniques','Dr. N. Behera','R01S',['L9'],true,false),
+            Crs('ED3PIP','Pre-internship Practice (Demo lessons, Peer teaching)','Dr. N. Acharyya, Dr. Avijit Kumar, Dr. H. Kumar, Dr. S. Rath','R01S',['F4'],true,false),
+            Crs('PH3ELEC','Thermal Physics','TBA','TBA',[],false,true) ],
+        7:[]
+      },
+      chemistry: {
+        1:[ Crs('CY1L301','Basic Organic Chemistry','Prof. V. R. Pedireddi','R23S',['MW2','L7','L8'],true,true),
+            Crs('CY1P301','Organic Lab – I','Prof. U. Ojha','—',['L9'],true,true) ],
+        3:[ Crs('CY2L301','Thermodynamics & Colligative Properties','Prof. A. Biswas','L23S',['MW1'],true,false),
+            Crs('CY2L302','Organic Spectroscopy','Dr. T. Khan','L20S',['MW1'],true,false),
+            Crs('CY2L303','Basic Inorganic Chemistry','Dr. A. Maiti','L20S',['TR1'],true,true),
+            Crs('CY2P301','Inorganic Lab – I','Dr. A. Das','—',['L10'],true,true) ],
+        5:[ Crs('ED3L005','Pedagogy for Chemistry – 2','Dr. T. Patra & Dr. P. Roy','R00S',['TR2'],true,false),
+            Crs('CY3L301','Organometallic & Bioinorganic Chemistry','Dr. A. K. Singh','L21S',['TR1'],true,false),
+            Crs('CY3L302','Quantum Chemistry & Molecular Spectroscopy','Dr. K. Samanta','L20S',['TR3'],true,false),
+            Crs('CY3P301','Organic Lab – II','Prof. S. Pal','—',['L2'],true,false),
+            Crs('CY3P302','Inorganic Lab – II','Dr. S. Patra','—',['L6'],true,false),
+            Crs('ED3PIP','Pre-internship Practice (Demo lessons, Peer teaching)','Prof. U. Ojha, Dr. S. Patra, Dr. P. Roy, Dr. T. Patra','R03S',['F4'],true,false),
+            Crs('CY3ELEC','Industrial and Polymer Chemistry','TBA','TBA',[],false,true) ],
+        7:[]
+      }
+    }
+  };
+}
+
+/* ============================================================
+   DATA STORE (persisted to localStorage, editable by admin)
+   ============================================================ */
+const STORAGE_KEY = 'itep_timetable_data_v1';
+let DATA = loadData();
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){ console.warn('Could not load saved data, using defaults', e); }
+  return factoryData();
+}
+function saveData(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){ console.warn('Could not save data', e); }
+}
+
+/* ============================================================
+   STUDENT-FACING CONTROLS
+   ============================================================ */
+const majorSel = document.getElementById('major');
+const semSel = document.getElementById('semester');
+const minorSel = document.getElementById('minor');
+const pedagogySel = document.getElementById('pedagogy');
+const pedagogyField = document.getElementById('pedagogyField');
+const PEDAGOGY_SEMS = [4,5,6];
+
+MAJORS.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=DEPT_NAMES[m]; majorSel.appendChild(o); });
+SEMESTERS.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent='Semester '+s; semSel.appendChild(o); });
+
+function refreshMinorOptions(){
+  const maj = majorSel.value, sem = semSel.value;
+  minorSel.innerHTML='';
+  const none = document.createElement('option'); none.value=''; none.textContent='— No minor —';
+  minorSel.appendChild(none);
+  if (sem == 7){ minorSel.disabled = true; return; }
+  minorSel.disabled = false;
+  MAJORS.filter(m=>m!==maj).forEach(m=>{
+    const o=document.createElement('option'); o.value=m; o.textContent=DEPT_NAMES[m]; minorSel.appendChild(o);
+  });
+}
+function refreshPedagogyOptions(){
+  const maj = majorSel.value, sem = Number(semSel.value);
+  pedagogySel.innerHTML='';
+  const none = document.createElement('option'); none.value=''; none.textContent='— No pedagogy paper —';
+  pedagogySel.appendChild(none);
+  if (!PEDAGOGY_SEMS.includes(sem)){
+    pedagogyField.style.display='none';
+    pedagogySel.value='';
+    return;
+  }
+  pedagogyField.style.display='flex';
+  // Pedagogy paper options: subjects other than the student's major
+  MAJORS.filter(m=>m!==maj).forEach(m=>{
+    const o=document.createElement('option'); o.value=m; o.textContent=DEPT_NAMES[m]; pedagogySel.appendChild(o);
+  });
+}
+majorSel.addEventListener('change', ()=>{ refreshMinorOptions(); refreshPedagogyOptions(); });
+semSel.addEventListener('change', ()=>{ refreshMinorOptions(); refreshPedagogyOptions(); });
+refreshMinorOptions();
+refreshPedagogyOptions();
+
+let schedule = [];
+let idCounter = 0;
+
+function symbolsToPlacements(slots){
+  const out=[];
+  (slots||[]).forEach(sym=>{
+    const def = SLOT[sym];
+    if(!def) return;
+    def.forEach(([day,start,end])=> out.push({day,start,end,symbol:sym}));
+  });
+  return out;
+}
+/* If an admin has manually shifted a course's classes, those overrides win over the slot codes. */
+function getPlacements(course){
+  if (course.manualOverrides && course.manualOverrides.length){
+    return course.manualOverrides.map(p=>({...p}));
+  }
+  return symbolsToPlacements(course.slots);
+}
+
+function buildSchedule(){
+  const maj = majorSel.value, sem = Number(semSel.value), minor = minorSel.value;
+  const pedagogy = PEDAGOGY_SEMS.includes(sem) ? pedagogySel.value : '';
+  schedule = [];
+  const majorCourses = [...(DATA.COMMON[sem]||[]), ...((DATA.COURSES[maj][sem]||[]).filter(c=>c.isMajor))];
+  majorCourses.forEach(c=>{
+    schedule.push({ id:'e'+(idCounter++), code:c.code, name:c.name, faculty:c.faculty, room:c.room,
+      kind:'major', placements: getPlacements(c) });
+  });
+  if (minor && sem != 7){
+    (DATA.COURSES[minor][sem]||[]).filter(c=>c.isMinor).forEach(c=>{
+      schedule.push({ id:'e'+(idCounter++), code:c.code, name:c.name, faculty:c.faculty, room:c.room,
+        kind:'minor', placements: getPlacements(c) });
+    });
+  }
+  if (pedagogy){
+    // Pedagogy Paper: only courses the admin has marked as offered as a pedagogy paper
+    (DATA.COURSES[pedagogy][sem]||[]).filter(c=>c.isPedagogy).forEach(c=>{
+      schedule.push({ id:'e'+(idCounter++), code:c.code, name:c.name, faculty:c.faculty, room:c.room,
+        kind:'pedagogy', placements: getPlacements(c) });
+    });
+  }
+  render();
+}
+
+const DAY_START = 8*60, DAY_END = 18.5*60;
+function toMin(hhmm){ const [h,m]=hhmm.split(':').map(Number); return h*60+m; }
+const HOURS = [8,9,10,11,12,13,14,15,16,17,18];
+
+function render(){
+  const inner = document.getElementById('ttInner');
+  const actionsRow = document.getElementById('actionsRow');
+  if (!schedule.length){ inner.innerHTML='<div class="placeholder">No courses found.</div>'; actionsRow.style.display='none'; return; }
+  actionsRow.style.display='flex';
+
+  const maj = majorSel.value, sem = semSel.value, minor = minorSel.value;
+  const pedagogy = PEDAGOGY_SEMS.includes(Number(sem)) ? pedagogySel.value : '';
+  let html = `<h2 id="ttTitle">${DEPT_NAMES[maj]} — Semester ${sem}${minor? ' + Minor in '+DEPT_NAMES[minor]:''}${pedagogy? ' + Pedagogy Paper in '+DEPT_NAMES[pedagogy]:''}</h2>`;
+
+  html += `<div class="grid-outer"><div class="grid" id="gridEl">`;
+  html += `<div class="head"></div>`;
+  DAYS.forEach(d=> html += `<div class="head">${d}</div>`);
+  const totalH = DAY_END-DAY_START;
+  html += `<div class="timecol" style="height:${totalH}px;">`;
+  HOURS.forEach(h=>{
+    const top = (h*60-DAY_START);
+    html += `<div class="hourlabel" style="top:${top}px;">${h>12? (h-12)+' PM': (h===12?'12 PM':h+' AM')}</div>`;
+  });
+  html += `</div>`;
+  DAYS.forEach(day=>{
+    html += `<div class="daycol" style="height:${totalH}px;" data-day="${day}">`;
+    schedule.forEach(ev=>{
+      ev.placements.filter(p=>p.day===day).forEach((p)=>{
+        const top = toMin(p.start)-DAY_START;
+        const height = Math.max(28, toMin(p.end)-toMin(p.start));
+        html += `<div class="event ${ev.kind}" style="top:${top}px;height:${height}px;" data-id="${ev.id}" data-pidx="${ev.placements.indexOf(p)}" title="Click to shift this class">
+          <span class="code">${ev.code}</span>${ev.name}<div class="rm">${ev.room!=='—'?ev.room+' · ':''}${p.start}-${p.end}</div></div>`;
+      });
+    });
+    html += `</div>`;
+  });
+  html += `</div></div>`;
+
+  const unsched = schedule.filter(ev=>ev.placements.length===0);
+  if (unsched.length){
+    html += `<div class="unscheduled"><h3>Not yet assigned a slot (per official sheet) — add manually once known</h3>`;
+    unsched.forEach(ev=>{
+      html += `<div class="uitem ${ev.kind}"><span><strong>${ev.code}</strong> — ${ev.name}</span><span>${ev.faculty}</span></div>`;
+    });
+    html += `</div>`;
+  }
+  inner.innerHTML = html;
+  inner.querySelectorAll('.event').forEach(el=>{
+    el.addEventListener('click', ()=> openShiftModal(el.dataset.id, Number(el.dataset.pidx)));
+  });
+}
+
+const modalBg = document.getElementById('modalBg');
+const shiftDay = document.getElementById('shiftDay');
+const shiftTime = document.getElementById('shiftTime');
+let activeShift = null;
+
+DAYS.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; shiftDay.appendChild(o); });
+for(let m=DAY_START; m<DAY_END; m+=30){
+  const hh=String(Math.floor(m/60)).padStart(2,'0'), mm=String(m%60).padStart(2,'0');
+  const o=document.createElement('option'); o.value=`${hh}:${mm}`; o.textContent=`${hh}:${mm}`; shiftTime.appendChild(o);
+}
+
+function openShiftModal(id, pidx, context){
+  context = context || 'student';
+  if (context === 'student'){
+    const ev = schedule.find(e=>e.id===id);
+    if(!ev) return;
+    activeShift = {context, id, pidx};
+    document.getElementById('modalTitle').textContent = ev.code+' — shift class';
+    document.getElementById('modalSub').textContent = ev.name+' (originally '+ev.placements[pidx].day+' '+ev.placements[pidx].start+'–'+ev.placements[pidx].end+')';
+    shiftDay.value = ev.placements[pidx].day;
+    shiftTime.value = ev.placements[pidx].start;
+  } else {
+    const course = currentAdminList()[id];
+    if(!course) return;
+    const placements = getPlacements(course);
+    activeShift = {context, id, pidx, placements};
+    document.getElementById('modalTitle').textContent = course.code+' — shift class (admin)';
+    document.getElementById('modalSub').textContent = course.name+' (originally '+placements[pidx].day+' '+placements[pidx].start+'–'+placements[pidx].end+')';
+    shiftDay.value = placements[pidx].day;
+    shiftTime.value = placements[pidx].start;
+  }
+  modalBg.classList.add('show');
+}
+document.getElementById('modalCancel').addEventListener('click', ()=> modalBg.classList.remove('show'));
+document.getElementById('modalDelete').addEventListener('click', ()=>{
+  if(!activeShift) return;
+  if (activeShift.context === 'student'){
+    const ev = schedule.find(e=>e.id===activeShift.id);
+    if(!ev) return;
+    if(!confirm('Delete this one class meeting from your timetable? (The rest of the course\'s meetings stay.)')) return;
+    ev.placements.splice(activeShift.pidx, 1);
+    modalBg.classList.remove('show');
+    render();
+  } else {
+    const course = currentAdminList()[activeShift.id];
+    if(!course) return;
+    if(!confirm('Delete this one class meeting? (The rest of the course\'s meetings stay.)')) return;
+    const placements = activeShift.placements;
+    placements.splice(activeShift.pidx, 1);
+    placements.forEach(p=> delete p.symbol);
+    course.manualOverrides = placements.map(pl=>({day:pl.day, start:pl.start, end:pl.end}));
+    saveData();
+    modalBg.classList.remove('show');
+    renderAdminPreview();
+  }
+});
+document.getElementById('modalSave').addEventListener('click', ()=>{
+  if(!activeShift) return;
+  if (activeShift.context === 'student'){
+    const ev = schedule.find(e=>e.id===activeShift.id);
+    const p = ev.placements[activeShift.pidx];
+    const oldDur = toMin(p.end)-toMin(p.start);
+    p.day = shiftDay.value;
+    const newStart = toMin(shiftTime.value);
+    p.start = shiftTime.value;
+    const endMin = Math.min(newStart+oldDur, DAY_END);
+    const eh=String(Math.floor(endMin/60)).padStart(2,'0'), em=String(Math.round(endMin%60)).padStart(2,'0');
+    p.end = `${eh}:${em}`;
+    modalBg.classList.remove('show');
+    render();
+  } else {
+    const course = currentAdminList()[activeShift.id];
+    const placements = activeShift.placements; // full set, one entry per class meeting
+    const p = placements[activeShift.pidx];
+    const oldDur = toMin(p.end)-toMin(p.start);
+    p.day = shiftDay.value;
+    const newStart = toMin(shiftTime.value);
+    p.start = shiftTime.value;
+    const endMin = Math.min(newStart+oldDur, DAY_END);
+    const eh=String(Math.floor(endMin/60)).padStart(2,'0'), em=String(Math.round(endMin%60)).padStart(2,'0');
+    p.end = `${eh}:${em}`;
+    delete p.symbol;
+    course.manualOverrides = placements.map(pl=>({day:pl.day, start:pl.start, end:pl.end}));
+    saveData();
+    modalBg.classList.remove('show');
+    renderAdminTable();
+  }
+});
+
+document.getElementById('buildBtn').addEventListener('click', buildSchedule);
+document.getElementById('resetBtn').addEventListener('click', buildSchedule);
+
+document.getElementById('downloadBtn').addEventListener('click', ()=>{
+  const card = document.getElementById('timetableCard');
+  const name = document.getElementById('studentNameInput').value.trim();
+
+  let nameEl = null;
+  if (name){
+    nameEl = document.createElement('div');
+    nameEl.id = 'ttStudentName';
+    nameEl.style.cssText = 'margin:-4px 0 14px; font-size:.95rem; font-weight:700; color:var(--pink-dark);';
+    nameEl.textContent = 'Name: ' + name;
+    const title = document.getElementById('ttTitle');
+    title.insertAdjacentElement('afterend', nameEl);
+  }
+
+  html2canvas(card, {scale:2, backgroundColor:'#ffffff'}).then(canvas=>{
+    if (nameEl) nameEl.remove();
+    const link = document.createElement('a');
+    const maj = majorSel.value, sem = semSel.value;
+    const fileNamePart = name ? '_' + name.replace(/[^a-z0-9]+/gi,'') : '';
+    link.download = `ITEP_Timetable_${DEPT_NAMES[maj]}_Sem${sem}${fileNamePart}.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 0.95);
+    link.click();
+  }).catch(()=>{ if (nameEl) nameEl.remove(); });
+});
+
+/* ============================================================
+   ADMIN PANEL
+   ============================================================ */
+const adminPanel = document.getElementById('adminPanel');
+const adminDept = document.getElementById('adminDept');
+const adminSem = document.getElementById('adminSem');
+const adminTbody = document.getElementById('adminTbody');
+const ADMIN_PASSWORD = 'SRI';
+
+/* Hidden trigger: type the word "admin" anywhere on the page (not while typing
+   into a text field) to bring up the password prompt. Nothing is visible until then. */
+let typedBuffer = '';
+window.addEventListener('keydown', (e)=>{
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return; // don't interfere with normal typing
+  if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)){
+    typedBuffer = (typedBuffer + e.key.toLowerCase()).slice(-10);
+    if (typedBuffer.endsWith('admin')){
+      typedBuffer = '';
+      openPasswordPrompt();
+    }
+  } else if (e.key !== 'Shift'){
+    typedBuffer = '';
+  }
+});
+
+const pwBg = document.getElementById('pwBg');
+const pwInput = document.getElementById('pwInput');
+const pwError = document.getElementById('pwError');
+
+function openPasswordPrompt(){
+  pwError.style.display = 'none';
+  pwInput.value = '';
+  pwBg.classList.add('show');
+  setTimeout(()=> pwInput.focus(), 50);
+}
+document.getElementById('pwCancel').addEventListener('click', ()=> pwBg.classList.remove('show'));
+document.getElementById('pwSubmit').addEventListener('click', tryUnlock);
+pwInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') tryUnlock(); });
+
+function tryUnlock(){
+  if (pwInput.value.trim().toUpperCase() === ADMIN_PASSWORD){
+    pwBg.classList.remove('show');
+    adminPanel.classList.add('show');
+    renderAdminTable();
+    adminPanel.scrollIntoView({behavior:'smooth', block:'start'});
+  } else {
+    pwError.style.display = 'block';
+    pwInput.value = '';
+    pwInput.focus();
+  }
+}
+document.getElementById('adminClose').addEventListener('click', ()=> adminPanel.classList.remove('show'));
+
+SEMESTERS.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent='Semester '+s; adminSem.appendChild(o); });
+adminDept.addEventListener('change', renderAdminTable);
+adminSem.addEventListener('change', renderAdminTable);
+
+function currentAdminList(){
+  const dept = adminDept.value, sem = adminSem.value;
+  if (dept === '__common__') return DATA.COMMON[sem] || (DATA.COMMON[sem]=[]);
+  return DATA.COURSES[dept][sem] || (DATA.COURSES[dept][sem]=[]);
+}
+
+function renderAdminTable(){
+  const isCommon = adminDept.value === '__common__';
+  const ths = document.querySelectorAll('table.admin thead th');
+  ths[5].style.display = isCommon ? 'none':'';
+  ths[6].style.display = isCommon ? 'none':'';
+  ths[7].style.display = isCommon ? 'none':'';
+  const list = currentAdminList();
+  adminTbody.innerHTML = '';
+  list.forEach((c, idx)=> adminTbody.appendChild(adminRow(c, idx, isCommon)));
+  renderAdminPreview();
+}
+
+function adminRow(c, idx, isCommon){
+  const tr = document.createElement('tr');
+  tr.dataset.idx = idx;
+  tr.innerHTML = `
+    <td><input type="text" data-f="code" value="${escapeHtml(c.code)}"></td>
+    <td><input type="text" data-f="name" value="${escapeHtml(c.name)}"></td>
+    <td><input type="text" data-f="faculty" value="${escapeHtml(c.faculty)}"></td>
+    <td><input type="text" data-f="room" value="${escapeHtml(c.room)}"></td>
+    <td><input type="text" data-f="slots" value="${escapeHtml((c.slots||[]).join(', '))}"></td>
+    <td style="text-align:center; display:${isCommon?'none':''}"><input type="checkbox" data-f="isMajor" ${c.isMajor?'checked':''}></td>
+    <td style="text-align:center; display:${isCommon?'none':''}"><input type="checkbox" data-f="isMinor" ${c.isMinor?'checked':''}></td>
+    <td style="text-align:center; display:${isCommon?'none':''}"><input type="checkbox" data-f="isPedagogy" ${c.isPedagogy?'checked':''}></td>
+    <td><button class="danger" data-del="1">✕</button></td>
+  `;
+  tr.querySelector('[data-del]').addEventListener('click', ()=>{ tr.remove(); });
+  return tr;
+}
+function escapeHtml(s){ return String(s==null?'':s).replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function renderAdminPreview(){
+  const card = document.getElementById('adminPreviewCard');
+  const list = currentAdminList();
+  const withPlacements = list.map((c,idx)=>({ c, idx, placements:getPlacements(c) }));
+  const anyPlacements = withPlacements.some(x=>x.placements.length);
+  if (!list.length){ card.innerHTML = '<div class="placeholder">No courses saved yet for this department/semester.</div>'; return; }
+  if (!anyPlacements){ card.innerHTML = '<div class="placeholder">None of these courses have a slot assigned yet — set Slots in the table above, then Save.</div>'; return; }
+
+  let html = `<div class="grid-outer"><div class="grid">`;
+  html += `<div class="head"></div>`;
+  DAYS.forEach(d=> html += `<div class="head">${d}</div>`);
+  const totalH = DAY_END-DAY_START;
+  html += `<div class="timecol" style="height:${totalH}px;">`;
+  HOURS.forEach(h=>{
+    const top=(h*60-DAY_START);
+    html += `<div class="hourlabel" style="top:${top}px;">${h>12?(h-12)+' PM':(h===12?'12 PM':h+' AM')}</div>`;
+  });
+  html += `</div>`;
+  DAYS.forEach(day=>{
+    html += `<div class="daycol" style="height:${totalH}px;">`;
+    withPlacements.forEach(({c,idx,placements})=>{
+      placements.filter(p=>p.day===day).forEach(p=>{
+        const pidx = placements.indexOf(p);
+        const top = toMin(p.start)-DAY_START;
+        const height = Math.max(28, toMin(p.end)-toMin(p.start));
+        const cls = c.manualOverrides && c.manualOverrides.length ? 'minor' : 'major';
+        html += `<div class="event ${cls}" style="top:${top}px;height:${height}px;" data-cidx="${idx}" data-pidx="${pidx}" title="Click to shift this class">
+          <span class="code">${c.code}${c.manualOverrides&&c.manualOverrides.length?' ✎':''}</span>${c.name}<div class="rm">${p.start}-${p.end}</div></div>`;
+      });
+    });
+    html += `</div>`;
+  });
+  html += `</div></div>`;
+
+  const shifted = withPlacements.filter(x=>x.c.manualOverrides && x.c.manualOverrides.length);
+  if (shifted.length){
+    html += `<div class="unscheduled"><h3>Manually shifted (✎) — click to revert to the official slot code</h3>`;
+    shifted.forEach(({c,idx})=>{
+      html += `<div class="uitem minor"><span><strong>${c.code}</strong> — ${c.name}</span><button class="danger" data-revert="${idx}">↺ Revert</button></div>`;
+    });
+    html += `</div>`;
+  }
+
+  card.innerHTML = html;
+  card.querySelectorAll('.event').forEach(el=>{
+    el.addEventListener('click', ()=> openShiftModal(Number(el.dataset.cidx), Number(el.dataset.pidx), 'admin'));
+  });
+  card.querySelectorAll('[data-revert]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const c = currentAdminList()[Number(btn.dataset.revert)];
+      c.manualOverrides = [];
+      saveData();
+      renderAdminPreview();
+    });
+  });
+}
+
+document.getElementById('adminAddRow').addEventListener('click', ()=>{
+  const isCommon = adminDept.value === '__common__';
+  const blank = Crs('','','','',[]);
+  const row = adminRow(blank, adminTbody.children.length, isCommon);
+  adminTbody.appendChild(row);
+});
+
+document.getElementById('adminSaveBtn').addEventListener('click', ()=>{
+  const isCommon = adminDept.value === '__common__';
+  const dept = adminDept.value, sem = adminSem.value;
+  const oldList = currentAdminList();
+  const rows = Array.from(adminTbody.querySelectorAll('tr'));
+  const newList = rows.map((tr,i)=>{
+    const get = f => tr.querySelector(`[data-f="${f}"]`);
+    const code = get('code').value.trim();
+    const name = get('name').value.trim();
+    const faculty = get('faculty').value.trim();
+    const room = get('room').value.trim();
+    const slots = get('slots').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const isMajor = isCommon ? true : get('isMajor').checked;
+    const isMinor = isCommon ? false : get('isMinor').checked;
+    const isPedagogy = isCommon ? false : get('isPedagogy').checked;
+    const c = Crs(code,name,faculty,room,slots,isMajor,isMinor,isPedagogy);
+    if (oldList[i] && oldList[i].manualOverrides && oldList[i].manualOverrides.length){
+      c.manualOverrides = oldList[i].manualOverrides.map(p=>({...p}));
+    }
+    return c;
+  }).filter(c=>c.code || c.name);
+  if (isCommon){ DATA.COMMON[sem] = newList; }
+  else { DATA.COURSES[dept][sem] = newList; }
+  saveData();
+  renderAdminTable();
+  alert('Saved. Students will see these changes next time they build a timetable.');
+});
+
+document.getElementById('adminResetBtn').addEventListener('click', ()=>{
+  if(!confirm('Reset this department + semester table back to the original factory data?')) return;
+  const fresh = factoryData();
+  const isCommon = adminDept.value === '__common__';
+  const dept = adminDept.value, sem = adminSem.value;
+  if (isCommon){ DATA.COMMON[sem] = fresh.COMMON[sem]; }
+  else { DATA.COURSES[dept][sem] = fresh.COURSES[dept][sem]; }
+  saveData();
+  renderAdminTable();
+});
+
+document.getElementById('factoryResetBtn').addEventListener('click', ()=>{
+  if(!confirm('This resets ALL departments and semesters back to the original factory data. Continue?')) return;
+  DATA = factoryData();
+  saveData();
+  renderAdminTable();
+});
+
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'itep_timetable_data.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const parsed = JSON.parse(reader.result);
+      if(!parsed.COMMON || !parsed.COURSES) throw new Error('Missing COMMON/COURSES keys');
+      DATA = parsed; saveData(); renderAdminTable();
+      alert('Import successful.');
+    }catch(err){ alert('Could not import: '+err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+</script>
+</body>
+</html>

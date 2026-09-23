@@ -1,0 +1,30 @@
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Node (in case tooling is ever added)
+node_modules/
+
+# Local env / secrets
+.env
+.env.local
+
+# Backup / temp files
+*.bak
+*.tmp
+*.orig
+
+# Downloaded timetable JPGs (student output, not source)
+ITEP_Timetable_*.jpg
