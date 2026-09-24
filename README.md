@@ -51,16 +51,3 @@ Two ways to add or change course data:
 
 1. **Through the app** — open the Admin Panel (password-protected), pick a Department and Semester, edit rows or add new courses, tick Major/Minor/Pedagogy as needed, and click **Save changes**. Use **Export all data (JSON)** to back up your edits, and **Import data (JSON)** to load them on another device or share with someone else.
 2. **Editing the source** — the factory-default data lives inline in `index.html` inside the `DATA` object. Editing it there changes what every visitor sees by default (Admin Panel edits are saved per-browser via `localStorage` and won't affect other visitors until re-imported).
-
-## ⚠️ Security note
-
-This is a static, client-side app — there is no backend and no real authentication. The Admin Panel's password check happens entirely in the page's own JavaScript, which means:
-
-- Anyone who views the page source (or this repo, if public) can find the password check logic.
-- Admin edits made in one visitor's browser are stored locally in *their* browser only — they do not sync to other visitors unless explicitly exported and re-imported.
-
-Treat the admin password as a light deterrent against casual tampering, not a real security control. Don't put anything sensitive in the course data.
-
-## License
-
-Add a license of your choice (MIT is a common default for small campus tools) or leave this section out if you'd rather keep it unlicensed.
