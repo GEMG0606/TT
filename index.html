@@ -112,6 +112,7 @@
     <h1>🎓 ITEP Timetable Builder</h1>
     <p class="sub">Autumn 2026 · Pick your Major and (optionally) a Minor to see your personal class schedule.</p>
   </div>
+  <div id="cloudSyncStatus" style="font-size:.75rem; color:#8a7468; align-self:flex-end;"></div>
 </div>
 
 <div id="adminPanel">
@@ -119,7 +120,7 @@
     <h2>🔧 Admin — Edit Timetable Data</h2>
     <button class="ghost" id="adminClose">✖ Close</button>
   </div>
-  <p class="sub">Changes save to this browser automatically. Use Export/Import to move your edits to another device or hand them to someone else.</p>
+  <p class="sub">Changes save to the shared database automatically — everyone visiting this page sees them. Use Export/Import as a manual backup if you ever need it.</p>
 
   <div class="admin-toolbar">
     <div class="field">
@@ -364,20 +365,86 @@ function factoryData(){
 }
 
 /* ============================================================
-   DATA STORE (persisted to localStorage, editable by admin)
+   DATA STORE — shared across everyone via Supabase.
+   localStorage is kept only as an instant-paint cache / offline fallback.
    ============================================================ */
 const STORAGE_KEY = 'itep_timetable_data_v1';
+
+const SUPABASE_URL = 'https://mavyqxucmkilajfsbkvz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdnlxeHVjbWtpbGFqZnNia3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyMTc4ODQsImV4cCI6MjEwNTc5Mzg4NH0.W729wS8HLp2G7HW9ZuqFFSnND6Q3QUZ2Hjm4o4-3KgU';
+const SUPABASE_ROW_ID = 'itep_timetable_v1';
+const SUPABASE_TABLE_URL = `${SUPABASE_URL}/rest/v1/timetable_data`;
+const SUPABASE_HEADERS = {
+  'apikey': SUPABASE_ANON_KEY,
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json'
+};
+
 let DATA = loadData();
+let cloudSyncStatusEl = null; // wired up once the DOM is ready
 
 function loadData(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw) return JSON.parse(raw);
-  }catch(e){ console.warn('Could not load saved data, using defaults', e); }
+  }catch(e){ console.warn('Could not load cached data, using defaults', e); }
   return factoryData();
 }
+
 function saveData(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){ console.warn('Could not save data', e); }
+  // Instant local cache so the current tab never feels laggy / never loses data if offline.
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){ console.warn('Could not cache data locally', e); }
+  pushToCloud();
+}
+
+function setSyncStatus(text, isError){
+  if(!cloudSyncStatusEl) return;
+  cloudSyncStatusEl.textContent = text;
+  cloudSyncStatusEl.style.color = isError ? '#c0392b' : '#8a7468';
+}
+
+// Push the current DATA object up to the shared Supabase row.
+async function pushToCloud(){
+  setSyncStatus('Saving to cloud…');
+  try{
+    const res = await fetch(`${SUPABASE_TABLE_URL}?id=eq.${SUPABASE_ROW_ID}`, {
+      method: 'PATCH',
+      headers: { ...SUPABASE_HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ data: DATA, updated_at: new Date().toISOString() })
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    setSyncStatus('Saved — visible to everyone ✓');
+  }catch(e){
+    console.warn('Could not save to Supabase', e);
+    setSyncStatus('Cloud save failed — changes are only on this device', true);
+  }
+}
+
+// Pull the latest shared DATA from Supabase (called on page load).
+async function pullFromCloud(){
+  setSyncStatus('Loading latest data…');
+  try{
+    const res = await fetch(`${SUPABASE_TABLE_URL}?id=eq.${SUPABASE_ROW_ID}&select=data`, {
+      headers: { ...SUPABASE_HEADERS, 'Accept': 'application/json' }
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    if(rows && rows[0] && rows[0].data && Object.keys(rows[0].data).length){
+      DATA = rows[0].data;
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
+      setSyncStatus('Up to date ✓');
+      // Refresh whichever view is currently visible with the freshly pulled data.
+      if (adminPanel && adminPanel.classList.contains('show')) renderAdminTable();
+      if (typeof schedule !== 'undefined' && schedule && schedule.length) buildSchedule();
+    } else {
+      // Nothing in the cloud yet (fresh table) — seed it with whatever we have locally.
+      setSyncStatus('Up to date ✓');
+      pushToCloud();
+    }
+  }catch(e){
+    console.warn('Could not load from Supabase, using local/factory data', e);
+    setSyncStatus('Offline — showing last saved data on this device', true);
+  }
 }
 
 /* ============================================================
@@ -643,6 +710,8 @@ document.getElementById('downloadBtn').addEventListener('click', ()=>{
    ADMIN PANEL
    ============================================================ */
 const adminPanel = document.getElementById('adminPanel');
+cloudSyncStatusEl = document.getElementById('cloudSyncStatus');
+pullFromCloud();
 const adminDept = document.getElementById('adminDept');
 const adminSem = document.getElementById('adminSem');
 const adminTbody = document.getElementById('adminTbody');
