@@ -684,26 +684,41 @@ document.getElementById('resetBtn').addEventListener('click', buildSchedule);
 document.getElementById('downloadBtn').addEventListener('click', ()=>{
   const card = document.getElementById('timetableCard');
   const name = document.getElementById('studentNameInput').value.trim();
+  const EXPORT_W = 1100; // fixed desktop-width render so phones don't crop the grid
 
-  let nameEl = null;
+  // Render an off-screen desktop-width clone instead of the live (phone-width, scrollable) card
+  const stage = document.createElement('div');
+  stage.style.cssText = 'position:fixed; left:-10000px; top:0; width:'+EXPORT_W+'px; background:#fff; z-index:-1;';
+  const clone = card.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.style.cssText = 'width:'+EXPORT_W+'px; max-width:none; box-shadow:none; box-sizing:border-box;';
+  clone.querySelectorAll('.grid-outer').forEach(el=>{ el.style.overflow='visible'; el.style.width='100%'; });
+  clone.querySelectorAll('.grid').forEach(el=>{ el.style.minWidth='0'; el.style.width='100%'; });
+
   if (name){
-    nameEl = document.createElement('div');
-    nameEl.id = 'ttStudentName';
+    const nameEl = document.createElement('div');
     nameEl.style.cssText = 'margin:-4px 0 14px; font-size:.95rem; font-weight:700; color:var(--pink-dark);';
     nameEl.textContent = 'Name: ' + name;
-    const title = document.getElementById('ttTitle');
-    title.insertAdjacentElement('afterend', nameEl);
+    const title = clone.querySelector('#ttTitle');
+    if (title) title.insertAdjacentElement('afterend', nameEl);
   }
+  stage.appendChild(clone);
+  document.body.appendChild(stage);
 
-  html2canvas(card, {scale:2, backgroundColor:'#ffffff'}).then(canvas=>{
-    if (nameEl) nameEl.remove();
+  const cleanup = ()=>{ if (stage.parentNode) stage.remove(); };
+  html2canvas(clone, {
+    scale:2, backgroundColor:'#ffffff',
+    width:EXPORT_W, windowWidth:EXPORT_W,
+    scrollX:0, scrollY:0, useCORS:true
+  }).then(canvas=>{
+    cleanup();
     const link = document.createElement('a');
     const maj = majorSel.value, sem = semSel.value;
     const fileNamePart = name ? '_' + name.replace(/[^a-z0-9]+/gi,'') : '';
     link.download = `ITEP_Timetable_${DEPT_NAMES[maj]}_Sem${sem}${fileNamePart}.jpg`;
     link.href = canvas.toDataURL('image/jpeg', 0.95);
     link.click();
-  }).catch(()=>{ if (nameEl) nameEl.remove(); });
+  }).catch(cleanup);
 });
 
 /* ============================================================
