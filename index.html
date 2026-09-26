@@ -122,6 +122,11 @@
   </div>
   <p class="sub">Changes save to the shared database automatically — everyone visiting this page sees them. Use Export/Import as a manual backup if you ever need it.</p>
 
+  <div class="field" style="flex-direction:row; align-items:center; gap:8px; margin-bottom:14px;">
+    <input type="checkbox" id="adminShowFaculty" style="width:16px; height:16px; cursor:pointer;">
+    <label for="adminShowFaculty" style="text-transform:none; letter-spacing:0; font-size:.85rem; color:var(--ink); font-weight:600;">Show professor / faculty name on the student timetable</label>
+  </div>
+
   <div class="admin-toolbar">
     <div class="field">
       <label>Department</label>
@@ -360,7 +365,8 @@ function factoryData(){
             Crs('CY3ELEC','Industrial and Polymer Chemistry','TBA','TBA',[],false,true) ],
         7:[]
       }
-    }
+    },
+    settings: { showFaculty: false }
   };
 }
 
@@ -383,10 +389,16 @@ const SUPABASE_HEADERS = {
 let DATA = loadData();
 let cloudSyncStatusEl = null; // wired up once the DOM is ready
 
+function ensureSettings(d){
+  if (!d.settings) d.settings = { showFaculty: false };
+  if (typeof d.settings.showFaculty !== 'boolean') d.settings.showFaculty = false;
+  return d;
+}
+
 function loadData(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw) return JSON.parse(raw);
+    if(raw) return ensureSettings(JSON.parse(raw));
   }catch(e){ console.warn('Could not load cached data, using defaults', e); }
   return factoryData();
 }
@@ -430,10 +442,11 @@ async function pullFromCloud(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const rows = await res.json();
     if(rows && rows[0] && rows[0].data && Object.keys(rows[0].data).length){
-      DATA = rows[0].data;
+      DATA = ensureSettings(rows[0].data);
       try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
       setSyncStatus('Up to date ✓');
       // Refresh whichever view is currently visible with the freshly pulled data.
+      if (adminShowFaculty) adminShowFaculty.checked = !!DATA.settings.showFaculty;
       if (adminPanel && adminPanel.classList.contains('show')) renderAdminTable();
       if (typeof schedule !== 'undefined' && schedule && schedule.length) buildSchedule();
     } else {
@@ -567,8 +580,9 @@ function render(){
       ev.placements.filter(p=>p.day===day).forEach((p)=>{
         const top = toMin(p.start)-DAY_START;
         const height = Math.max(28, toMin(p.end)-toMin(p.start));
+        const showFac = DATA.settings && DATA.settings.showFaculty && ev.faculty && ev.faculty !== 'TBA';
         html += `<div class="event ${ev.kind}" style="top:${top}px;height:${height}px;" data-id="${ev.id}" data-pidx="${ev.placements.indexOf(p)}" title="Click to shift this class">
-          <span class="code">${ev.code}</span>${ev.name}<div class="rm">${ev.room!=='—'?ev.room+' · ':''}${p.start}-${p.end}</div></div>`;
+          <span class="code">${ev.code}</span>${ev.name}${showFac?`<div class="rm">${escapeHtml(ev.faculty)}</div>`:''}<div class="rm">${ev.room!=='—'?ev.room+' · ':''}${p.start}-${p.end}</div></div>`;
       });
     });
     html += `</div>`;
@@ -730,7 +744,15 @@ pullFromCloud();
 const adminDept = document.getElementById('adminDept');
 const adminSem = document.getElementById('adminSem');
 const adminTbody = document.getElementById('adminTbody');
+const adminShowFaculty = document.getElementById('adminShowFaculty');
 const ADMIN_PASSWORD = 'SRI';
+
+adminShowFaculty.addEventListener('change', ()=>{
+  DATA.settings.showFaculty = adminShowFaculty.checked;
+  saveData();
+  renderAdminPreview();
+  if (typeof schedule !== 'undefined' && schedule && schedule.length) render();
+});
 
 /* Hidden trigger: type the word "admin" anywhere on the page (not while typing
    into a text field) to bring up the password prompt. Nothing is visible until then. */
@@ -767,6 +789,7 @@ function tryUnlock(){
   if (pwInput.value.trim().toUpperCase() === ADMIN_PASSWORD){
     pwBg.classList.remove('show');
     adminPanel.classList.add('show');
+    adminShowFaculty.checked = !!DATA.settings.showFaculty;
     renderAdminTable();
     adminPanel.scrollIntoView({behavior:'smooth', block:'start'});
   } else {
@@ -844,8 +867,9 @@ function renderAdminPreview(){
         const top = toMin(p.start)-DAY_START;
         const height = Math.max(28, toMin(p.end)-toMin(p.start));
         const cls = c.manualOverrides && c.manualOverrides.length ? 'minor' : 'major';
+        const showFac = DATA.settings && DATA.settings.showFaculty && c.faculty && c.faculty !== 'TBA';
         html += `<div class="event ${cls}" style="top:${top}px;height:${height}px;" data-cidx="${idx}" data-pidx="${pidx}" title="Click to shift this class">
-          <span class="code">${c.code}${c.manualOverrides&&c.manualOverrides.length?' ✎':''}</span>${c.name}<div class="rm">${p.start}-${p.end}</div></div>`;
+          <span class="code">${c.code}${c.manualOverrides&&c.manualOverrides.length?' ✎':''}</span>${c.name}${showFac?`<div class="rm">${escapeHtml(c.faculty)}</div>`:''}<div class="rm">${p.start}-${p.end}</div></div>`;
       });
     });
     html += `</div>`;
