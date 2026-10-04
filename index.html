@@ -52,7 +52,7 @@
   #ttMeta{color:#8a7468; font-size:.85rem; margin-bottom:14px;}
   .grid-outer{overflow-x:auto;}
   .grid{
-    display:grid; grid-template-columns:64px repeat(5,1fr); min-width:760px;
+    display:grid; grid-template-columns:64px repeat(6,1fr); min-width:880px;
     border:1px solid var(--line); border-radius:10px; overflow:hidden;
   }
   .head{background:linear-gradient(135deg,var(--orange-light),var(--pink-light) 55%,var(--purple-light)); font-weight:700; text-align:center; padding:8px 4px; font-size:.82rem; color:var(--purple-dark); border-bottom:1px solid var(--line); border-left:1px solid var(--line);}
@@ -146,7 +146,7 @@
     <button class="secondary" id="adminSaveBtn">💾 Save changes</button>
     <button class="secondary" id="adminResetBtn">↩ Reset this table to default</button>
   </div>
-  <p class="admin-help">Slots: comma-separated codes from the official legend — lecture: mwf, tr, MW1, MW2, MW3, TR1, TR2, TR3, M, T, W, R, F1–F4 · lab: L1–L10. Leave blank for "not yet scheduled" (shown under the grid). Tick <b>Major</b> if this course counts toward that department's own major; tick <b>Minor</b> if a student minoring in this department takes it; tick <b>Pedagogy</b> if this course can be taken as a Pedagogy Paper (available to students in Semesters 4, 5 and 6 whose major is a different department).</p>
+  <p class="admin-help">Slots: comma-separated codes from the official legend — lecture: mwf, tr, MW1, MW2, MW3, TR1, TR2, TR3, M, T, W, R, F1–F4, S1–S4 (Saturday) · lab: L1–L10. Leave blank for "not yet scheduled" (shown under the grid). Tick <b>Major</b> if this course counts toward that department's own major; tick <b>Minor</b> if a student minoring in this department takes it; tick <b>Pedagogy</b> if this course can be taken as a Pedagogy Paper (available to students in Semesters 4, 5 and 6 whose major is a different department).</p>
 
   <table class="admin" id="adminTable">
     <thead>
@@ -264,17 +264,21 @@ const SLOT = {
   T:   [['Tue','16:30','18:25']],
   W:   [['Wed','16:30','18:25']],
   R:   [['Thu','16:30','18:25']],
-  F1:  [['Fri','11:00','12:55']],
-  F2:  [['Fri','14:30','16:25']],
-  F3:  [['Fri','16:30','18:25']],
-  F4:  [['Fri','9:00','10:55']],
+  F1:  [['Fri','9:00','10:55']],
+  F2:  [['Fri','11:00','12:55']],
+  F3:  [['Fri','14:30','16:25']],
+  F4:  [['Fri','16:30','18:25']],
+  S1:  [['Sat','9:00','10:55']],
+  S2:  [['Sat','11:00','12:55']],
+  S3:  [['Sat','14:30','16:25']],
+  S4:  [['Sat','16:30','18:25']],
   L1:  [['Mon','10:00','12:55']], L2:[['Mon','14:30','17:25']],
   L3:  [['Tue','10:00','12:55']], L4:[['Tue','14:30','17:25']],
   L5:  [['Wed','10:00','12:55']], L6:[['Wed','14:30','17:25']],
   L7:  [['Thu','10:00','12:55']], L8:[['Thu','14:30','17:25']],
   L9:  [['Fri','10:00','12:55']], L10:[['Fri','14:30','17:25']],
 };
-const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
 const MAJORS = ['economics','mathematics','physics','chemistry'];
 const SEMESTERS = [1,2,3,4,5,6,7,8];
 const DEPT_NAMES = {economics:'Economics', mathematics:'Mathematics', physics:'Physics', chemistry:'Chemistry'};
